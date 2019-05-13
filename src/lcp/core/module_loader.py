@@ -1,6 +1,6 @@
 # lcp Module Loader
 # iMagineLab - Living Character Program
-from lcp.core.module import Module
+from lcp.core.interfaces.module import Module
 import os
 import pathlib
 import importlib
@@ -13,9 +13,11 @@ class ModuleLoader(Module):
     __version = "1.0"
     __default_module_dir = "..\\modules\\"
 
-    def __init__(self):
+    def __init__(self, config):
         Module.__init__(self, self.__name, self.__version)
         self.__modules = []
+        self.__load_all_modules = config.getboolean('load_all', fallback=True)
+        self.__selected_modules = config.get('module_list', fallback='{}')
 
     def start_modules(self):
         index = 0
@@ -24,21 +26,30 @@ class ModuleLoader(Module):
             print("> Starting module:", module.name, "[", index, "of", len(self.__modules), "]")
             module.start()
 
-    def load_modules(self):
+    def load_modules(self, configurator):
         print("> Checking for modules...")
 
         python_modules = self.__get_python_module_list_from_dir(self.__default_module_dir)
         found_modules = self.__get_lcp_modules_from_python_modules(python_modules)
         print("> Found", len(found_modules), "modules")
+        if not self.__load_all_modules:
+            print("> Loading selection of modules: " + self.__selected_modules)
 
         index = 0
         loaded_modules = []
         for module in found_modules:
+            # Skip module if not in config list
+            if not self.__load_all_modules:
+                if module.__name__ not in self.__selected_modules:
+                    # Skip module
+                    continue
+
             index += 1
             print("> Loading module:", module.__name__, "[", index, "of", len(found_modules), "]")
 
             try:
-                init_module = module()
+                config = configurator.get_module_config(module.__name__)
+                init_module = module(config)
                 loaded_modules.append(init_module)
 
             except Exception as e:
