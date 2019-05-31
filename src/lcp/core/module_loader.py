@@ -17,7 +17,7 @@ class ModuleLoader(Module):
         Module.__init__(self, self.__name, self.__version)
         self.__modules = []
         self.__load_all_modules = config.getboolean('load_all', fallback=True)
-        self.__selected_modules = config.get('module_list', fallback='{}')
+        self.__selected_modules = config.get('module_list', fallback='')
 
     def start_modules(self):
         index = 0

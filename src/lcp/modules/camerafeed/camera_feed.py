@@ -10,6 +10,7 @@ class CameraFeed(Module):
 
     def __init__(self, config):
         super().__init__(self.__name, self.__version)
+        self.__camera_id = self.__parse_camera_id_config(config.get('camera_id', fallback='0'))
         self.__camera = []
         self.__frame = None
         self.__camera_thread = []
@@ -26,6 +27,15 @@ class CameraFeed(Module):
             pass
 
         return self.__frame
+
+    def __parse_camera_id_config(self, camera_id):
+        try:
+            parsed_camera_id = int(camera_id)
+        except:
+            # Is a non numeric value - return as string
+            parsed_camera_id = camera_id
+
+        return parsed_camera_id
 
     def __open_camera(self):
         self.__camera = cv.VideoCapture(0)
