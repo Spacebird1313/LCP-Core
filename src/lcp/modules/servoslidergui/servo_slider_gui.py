@@ -1,64 +1,60 @@
 from lcp.core.interfaces.module import Module
 from lcp.modules.servocontrol.servo_control import ServoControl
+from lcp.modules.guiwindowmanager.gui_window_manager import GUIWindowManager
 import PySimpleGUI as sgui
-import _thread
 
 
 class ServoSliderGUI(Module):
     __name = "Servo Slider GUI"
     __version = "1.0"
-    __dependencies = [ServoControl]
+    __dependencies = [ServoControl, GUIWindowManager]
 
     def __init__(self, config):
         super().__init__(self.__name, self.__version, self.__dependencies)
         self.__channel_priority_value = 999
         self.__servo_control = []
+        self.__window_manager = []
         self.__window = []
-        self.__update_gui_thread = []
 
     def install(self, modules):
         modules = super().install(modules)
         self.__servo_control = modules['ServoControl']
+        self.__window_manager = modules['GUIWindowManager']
 
     def start(self):
-        self.__update_gui_thread = _thread.start_new_thread(self.__update_gui, ())
+        self.__create_window()
 
-    def __update_gui(self):
-        self.__draw_gui()
+    def __event_callback(self, event, values):
+        if event is '__TIMEOUT__':
+            pass
+        elif event is None or event == 'Quit':
+            return
+        elif 'reset_all_ch' in event:
+            self.__reset_all_channels()
+        elif 'slider_ch_' in event:
+            channel_id = int(event[-1:])
+            channel_position = values[event]
+            channel_overwrite = values['overwrite_ch_' + str(channel_id)]
+            self.__channel_slider_moved(channel_id, channel_position, channel_overwrite)
+        elif 'overwrite_ch_' in event:
+            channel_id = int(event[-1:])
+            channel_position = values['slider_ch_' + str(channel_id)]
+            toggle_value = values[event]
+            self.__channel_overwrite_toggle(channel_id, channel_position, toggle_value)
+        elif 'reset_ch_' in event:
+            channel_id = int(event[-1:])
+            self.__channel_reset(channel_id)
+        else:
+            print('Error: Unknown event:', event, 'detected in ServoSliderGUI!')
 
-        while True:
-            event, values = self.__window.Read(timeout=0)
-
-            if event is '__TIMEOUT__':
-                pass
-            elif event is None or event == 'Quit':
-                break
-            elif 'reset_all_ch' in event:
-                self.__reset_all_channels()
-            elif 'slider_ch_' in event:
-                channel_id = int(event[-1:])
-                channel_position = values[event]
-                channel_overwrite = values['overwrite_ch_' + str(channel_id)]
-                self.__channel_slider_moved(channel_id, channel_position, channel_overwrite)
-            elif 'overwrite_ch_' in event:
-                channel_id = int(event[-1:])
-                channel_position = values['slider_ch_' + str(channel_id)]
-                toggle_value = values[event]
-                self.__channel_overwrite_toggle(channel_id, channel_position, toggle_value)
-            elif 'reset_ch_' in event:
-                channel_id = int(event[-1:])
-                self.__channel_reset(channel_id)
-            else:
-                print('Error: Unknown event:', event, 'detected in ServoSliderGUI!')
-
-            self.__update_sliders()
+        self.__update_sliders()
 
     def __update_sliders(self):
         channels = self.__servo_control.get_channels()
 
         for channel_id in channels:
             channel_position = channels[channel_id].position
-            self.__window.Element('slider_ch_' + str(channel_id)).Update(channel_position)
+            self.__window.get_gui_window().Element('slider_ch_' + str(channel_id)).Update(channel_position)
 
     def __reset_all_channels(self):
         self.__servo_control.reset_all_channel_positions()
@@ -76,7 +72,7 @@ class ServoSliderGUI(Module):
     def __channel_reset(self, channel_id):
         self.__servo_control.reset_channel_position(channel_id)
 
-    def __draw_gui(self):
+    def __create_window(self):
         layout = [[sgui.Text('Servo Slider Control', font=("Helvetica", 13))]]
 
         for servo_channel in self.__servo_control.get_channels().values():
@@ -89,4 +85,4 @@ class ServoSliderGUI(Module):
 
         layout.append([sgui.RButton('Reset all channels', key='reset_all_ch')])
 
-        self.__window = sgui.Window('LCP Servo Control', layout)
+        self.__window = self.__window_manager.create_window('LCP Servo Control', layout, self.__event_callback)
