@@ -12,13 +12,12 @@ class AnimationPlayer(Module):
 
     def __init__(self, config):
         super().__init__(self.__name, self.__version, self.__dependencies)
-        self.__servo_priority_value = 1
-        self.__servo_control = []
+        self.__servo_control = None
         self.__animation_thread = []
-        self.__FPS = 15.6
+        self.__FPS = 16.293
         self.__channel_priority = 1
         self.__interrupted = False
-        self.__playing = False
+        self.__playing = 0
 
     def install(self, modules):
         modules = super().install(modules)
@@ -30,23 +29,23 @@ class AnimationPlayer(Module):
     def stop_animation(self):
         self.__interrupted = True
 
-    def play_animation(self, file, blocking=False):
-        if self.__playing:
+    def play_animation(self, file, blocking=False, priority=1, overwrite=True):
+        if self.__playing > 0 and not overwrite:
             self.stop_animation()
 
-        while self.__playing:
+        while self.__playing > 0 and not overwrite:
             time.sleep(.1)
 
         if blocking:
-            self.__play_animation_thread(file)
+            self.__play_animation_thread(file, priority)
         else:
-            self.__animation_thread = _thread.start_new_thread(self.__play_animation_thread, file)
+            self.__animation_thread = _thread.start_new_thread(self.__play_animation_thread, (file, priority))
 
     def is_animation_playing(self):
-        return self.__playing
+        return self.__playing > 0
 
-    def __play_animation_thread(self, file):
-        self.__playing = True
+    def __play_animation_thread(self, file, priority):
+        self.__playing = self.__playing + 1
         self.__interrupted = False
         with open(file) as csv_file:
             motion_reader = csv.reader(csv_file, delimiter=',', quotechar='|')
@@ -66,7 +65,7 @@ class AnimationPlayer(Module):
                     if channel_index >= num_of_channels:
                         break
                     elif int(pos) != -1:
-                        self.__servo_control.set_channel_position(channel_index, int(pos), self.__channel_priority)
+                        self.__servo_control.set_channel_position(channel_index, int(pos), priority)
 
                     channel_index += 1
 
@@ -75,9 +74,9 @@ class AnimationPlayer(Module):
 
                 if self.__interrupted:
                     for channel_index in range(num_of_channels):
-                        self.__servo_control.release_channel_priority(channel_index, self.__channel_priority)
+                        self.__servo_control.release_channel_priority(channel_index, priority)
 
-                    self.__playing = False
+                    self.__playing = self.__playing - 1
                     return
 
                 if sleep_time > 0:
@@ -88,6 +87,6 @@ class AnimationPlayer(Module):
 
             # End of animation
             for channel_index in range(num_of_channels):
-                self.__servo_control.release_channel_priority(channel_index, self.__channel_priority)
+                self.__servo_control.release_channel_priority(channel_index, priority)
 
-            self.__playing = False
+            self.__playing = self.__playing - 1

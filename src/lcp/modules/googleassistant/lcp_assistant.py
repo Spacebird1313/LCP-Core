@@ -1,3 +1,7 @@
+from random import randrange
+from pydub import AudioSegment
+from pydub.playback import play
+import _thread
 import grpc
 import json
 import concurrent.futures
@@ -16,11 +20,12 @@ PLAYING = embedded_assistant_pb2.ScreenOutConfig.PLAYING
 class LCPAssistant(object):
     def __init__(self, language_code, device_model_id, device_id,
                  conversation_stream,
-                 channel, deadline_sec, device_handler):
+                 channel, deadline_sec, device_handler, animation_player):
         self.language_code = language_code
         self.device_model_id = device_model_id
         self.device_id = device_id
         self.conversation_stream = conversation_stream
+        self.animation_player = animation_player
 
         # Opaque blob provided in AssistResponse that,
         # when provided in a follow-up AssistRequest,
@@ -74,6 +79,7 @@ class LCPAssistant(object):
 
         # This generator yields AssistResponse proto messages
         # received from the gRPC Google Assistant API.
+        transcript = ''
         for resp in self.assistant.Assist(iter_log_assist_requests(),
                                           self.deadline):
             if resp.event_type == END_OF_UTTERANCE:
@@ -81,15 +87,24 @@ class LCPAssistant(object):
                 print('Assistant - Stopping recording.')
                 self.conversation_stream.stop_recording()
             if resp.speech_results:
-                print('Assistant - Transcript of user request: ',
-                             ' '.join(r.transcript
-                                      for r in resp.speech_results))
+                transcript = ''.join(r.transcript for r in resp.speech_results)
+                print('Assistant - Transcript of user request: ', transcript)
+
             if len(resp.audio_out.audio_data) > 0:
                 if not self.conversation_stream.playing:
                     self.conversation_stream.stop_recording()
                     self.conversation_stream.start_playback()
                     print('Assistant - Playing assistant response.')
                 self.conversation_stream.write(resp.audio_out.audio_data)
+
+                if 'song' in transcript or 'sing' in transcript:
+                    self.__sing_a_song()
+                    print('Assistant - Finished playing assistant response.')
+                    self.conversation_stream.stop_playback()
+                    return continue_conversation
+
+                transcript = ''
+
             if resp.dialog_state_out.conversation_state:
                 conversation_state = resp.dialog_state_out.conversation_state
                 print('Assistant - Updating conversation state.')
@@ -151,3 +166,35 @@ class LCPAssistant(object):
         for data in self.conversation_stream:
             # Subsequent requests need audio data, but not config.
             yield embedded_assistant_pb2.AssistRequest(audio_in=data)
+
+    def __sing_a_song(self):
+        SONG_ANIMATIONS = ['..//..//..//resources//songs//parrotslife.csv',
+                           '..//..//..//resources//songs//SomeoneIsWatchingMe.csv',
+                           '..//..//..//resources//songs//ImToSexy.csv',
+                           '..//..//..//resources//songs//MoveLikeJagger.csv',
+                           '..//..//..//resources//songs//WeWishYou.csv']
+                           #'..//..//..//resources//songs//WhiteChristmas.csv',
+                           #'..//..//..//resources//songs//LastChristmas.csv']
+        SONG_AUDIO = ['..//..//..//resources//songs//parrotslife.wav',
+                      '..//..//..//resources//songs//Someoneiswatchingme.wav',
+                      '..//..//..//resources//songs//Imtoosexy.wav',
+                      '..//..//..//resources//songs//MoveLikeJagger.wav',
+                      '..//..//..//resources//songs//Wewishyou.wav']
+                      #'..//..//..//resources//songs//WhiteChristmas.wav',
+                      #'..//..//..//resources//songs//LastChristmas.wav']
+
+        if self.animation_player is None:
+            return
+
+        try:
+            random_index = randrange(len(SONG_ANIMATIONS))
+            animation_file = SONG_ANIMATIONS[random_index]
+            audio_file = SONG_AUDIO[random_index]
+            _thread.start_new_thread(self.__audio_play, (audio_file,))
+            self.animation_player.play_animation(animation_file, blocking=True, priority=500, overwrite=True)
+        except:
+            print("Failed to play song audio!")
+
+    def __audio_play(self, audio_file_location):
+        audio_file = AudioSegment.from_wav(audio_file_location)
+        play(audio_file)

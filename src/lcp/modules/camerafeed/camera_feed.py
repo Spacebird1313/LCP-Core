@@ -13,6 +13,7 @@ class CameraFeed(Module):
         super().__init__(self.__name, self.__version)
         self.__camera_id = self.__parse_camera_id_config(config.get('camera_id', fallback='0'))
         self.__rotations = self.__parse_camera_rotation_config(config.get('camera_rotations', fallback=[]), len(self.__camera_id))
+        self.__calibration_preview = config.get('camera_calibration_preview', fallback=False)
         self.__cameras = []
         self.__frame = None
         self.__camera_thread = None
@@ -71,6 +72,9 @@ class CameraFeed(Module):
         self.__camera_thread = _thread.start_new_thread(self.__capture_frame, ())
 
     def __capture_frame(self):
+        if self.__calibration_preview:
+            self.__open_calibration_preview()
+
         while True:
             collected_frames = []
             for index, camera in enumerate(self.__cameras):
@@ -91,6 +95,28 @@ class CameraFeed(Module):
                     self.__frame = stitched_frame
             else:
                 self.__frame = collected_frames[0]
+
+    def __open_calibration_preview(self):
+        close_calibration = False
+        print("Press SPACE to close calibration preview...")
+
+        while not close_calibration:
+            collected_frames = []
+            for index, camera in enumerate(self.__cameras):
+                ret, camera_frame = camera.read()
+
+                if self.__rotations[index] is not 0:
+                    camera_frame = self.__rotate_frame(camera_frame, self.__rotations[index])
+
+                collected_frames.append(camera_frame)
+
+                cv.imshow("Camera stream: %d" % (index), camera_frame)
+
+            if cv.waitKey(1) == 32:
+                close_calibration = True
+
+                for index in range(len(self.__cameras)):
+                    cv.destroyWindow("Camera stream: %d" % (index))
 
     def __rotate_frame(self, frame, angle):
         h, w = frame.shape[:2]
@@ -136,7 +162,7 @@ class CameraFeed(Module):
 
     def __detect_and_describe(self, frame):
         descriptor = cv.xfeatures2d.SIFT_create()
-        kps, features = descriptor.detectAndCompute(frame, None)
+        kps, features = descriptor.detectAndCompute(cv.cvtColor(frame, cv.COLOR_BGR2GRAY), None)
 
         kps = np.float32([kp.pt for kp in kps])
 

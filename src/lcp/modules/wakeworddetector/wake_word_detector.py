@@ -3,7 +3,7 @@ from lcp.modules.audiorecorder.audio_recorder import AudioRecorder
 import platform
 import os
 import struct
-from pvporcupine import Porcupine
+import pvporcupine
 
 
 class WakeWordDetector(Module):
@@ -23,11 +23,11 @@ class WakeWordDetector(Module):
     def install(self, modules):
         modules = super().install(modules)
         self.__audio_recoder = modules['AudioRecorder']
-        self.__detect_handler = Porcupine(
-            library_path=self.__default_library_path(),
-            model_file_path=self.__model_file_path(),
-            keyword_file_path=self.__keyword_file_path(self.__keyword_filename),
-            sensitivity=self.__sensitivity)
+        self.__detect_handler = pvporcupine.create(
+            #library_path=self.__default_library_path(),
+            #model_path=self.__model_file_path(),
+            keyword_paths=[self.__keyword_file_path(self.__keyword_filename)],
+            sensitivities=[self.__sensitivity])
 
     def start(self):
         self.__audio_recoder.register_callback(self.__analyse_sample)
@@ -46,7 +46,7 @@ class WakeWordDetector(Module):
             pcm = struct.unpack_from("h" * self.__detect_handler.frame_length, in_data)
             result = self.__detect_handler.process(pcm)
 
-            if result:
+            if result >= 0:
                 for callback in self.__callbacks:
                     callback()
 

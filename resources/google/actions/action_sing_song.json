@@ -1,0 +1,48 @@
+{
+  "manifest": {
+    "displayName": "Sing-a-song",
+    "invocationName": "Sing a song",
+    "category": "ENTERTAINMENT"
+  },
+  "actions": [
+    {
+      "name": "SingASong",
+      "availability": {
+        "deviceClasses": [
+          {
+            "assistantSdkDevice": {}
+          }
+        ]
+      },
+      "intent": {
+        "name": "club.imaginelab.lcp.actions.sing-a-song",
+        "trigger": {
+          "queryPatterns": [
+            "Sing a song",
+            "Can you sing a song?",
+            "Do you sing?",
+            "Do you know a song?"
+          ]
+        }
+      },
+      "fulfillment": {
+        "staticFulfillment": {
+          "templatedResponse": {
+            "items": [
+              {
+                "simpleResponse": {
+                  "textToSpeech": "Ok! Let's sing together!"
+                }
+              },
+              {
+                "deviceExecution": {
+                  "command": "SingASong"
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

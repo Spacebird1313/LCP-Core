@@ -1,6 +1,7 @@
 from lcp.core.interfaces.module import Module
 from lcp.modules.audiomixer.audio_mixer import AudioMixer
 from lcp.modules.wakeworddetector.wake_word_detector import WakeWordDetector
+from lcp.modules.animationplayer.animation_player import AnimationPlayer
 from lcp.modules.googleassistant.lcp_assistant import LCPAssistant
 from . import audio_helper
 from . import device_helper
@@ -21,12 +22,13 @@ class GoogleAssistant(Module):
     __name = "Google Assistant"
     __version = "1.0"
     __dependencies = [AudioMixer]
-    __optional_dependencies = [WakeWordDetector]
+    __optional_dependencies = [WakeWordDetector, AnimationPlayer]
 
     def __init__(self, config):
         super().__init__(self.__name, self.__version, self.__dependencies, self.__optional_dependencies)
         self.__audio_mixer = None
         self.__wake_word_detector = None
+        self.__animation_player = None
         self.__credentials_file = "..\\..\\..\\resources\\google\\" + config.get('credentials_file', fallback='credentials.json')
         self.__device_config_file = "..\\..\\..\\resources\\google\\" + config.get('device_config_file', fallback='device.json')
         self.__language_code = config.get('language_code', fallback='en-US')
@@ -50,6 +52,12 @@ class GoogleAssistant(Module):
         try:
             self.__wake_word_detector = modules['WakeWordDetector']
             self.__wake_word_detector.register_callback(self.__trigger_conversation)
+        except:
+            # Optional module - skip
+            pass
+
+        try:
+            self.__animation_player = modules['AnimationPlayer']
         except:
             # Optional module - skip
             pass
@@ -93,7 +101,7 @@ class GoogleAssistant(Module):
 
         self.__device_handler = device_helper.DeviceRequestHandler(self.__device_id)
 
-        self.__assistant = LCPAssistant(self.__language_code, self.__device_model_id, self.__device_id, self.__conversation_stream, self.__channel, self.__deadline, self.__device_handler)
+        self.__assistant = LCPAssistant(self.__language_code, self.__device_model_id, self.__device_id, self.__conversation_stream, self.__channel, self.__deadline, self.__device_handler, self.__animation_player)
 
     def start(self):
         if not self.__wake_word_detector:

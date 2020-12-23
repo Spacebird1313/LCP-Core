@@ -15,6 +15,8 @@ class FaceDetector(Module):
         self.__face_classifier = []
         self.__absolute_face_size = 0
         self.__tracked_faces = []
+        self.__frame_width = 0
+        self.__frame_height = 0
         self.__camera_feed = []
         self.__detector_thread = []
 
@@ -29,11 +31,15 @@ class FaceDetector(Module):
     def get_detected_faces(self):
         return self.__tracked_faces
 
+    def get_frame_dimensions(self):
+        return self.__frame_width, self.__frame_height
+
     def __detect_faces(self):
         while True:
             frame = self.__camera_feed.get_frame()
             gray_frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
             gray_frame = cv.equalizeHist(gray_frame)
+            self.__frame_height, self.__frame_width, _ = frame.shape
 
             if self.__absolute_face_size == 0:
                 height, width = gray_frame.shape[:2]
